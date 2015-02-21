@@ -397,9 +397,32 @@ class Storage(object):
     finally:
       self.release_lock()
 
+# Since strings ARE unicode in Python3, "cleaning" the string doesn't mean
+# just converting to str.
+#
+#  As per the httplib2 documentation:
+#
+#    ** THE RESPONSE HEADERS ARE STRINGS, BUT THE CONTENT BODY IS BYTES **
+#
+def _clean_header(s):
+  """Always returns something of type str.  Raise UnicodeEncodeError if
+  unconvertable to ascii."""
+
+  if not isinstance(s, str):
+    # str(b'foo') will return "b'foo'" in Py3, not what we want.
+    if isinstance(s, bytes):
+      # Binary string in Py3
+      s = s.decode('utf-8')
+    else:
+      s = str(s)
+
+  # We're trying to generate the UnicodeEncodeError here if the string is
+  # unconvertable, AND keep this a string in both Py2 and Py3.
+  s = str((s.encode('ascii')).decode('utf-8'))
+  return s
 
 def clean_headers(headers):
-  """Forces header keys and values to be strings, i.e not unicode.
+  """Forces header keys and values to be strings suitable for httplib2.
 
   The httplib module just concats the header keys and values in a way that may
   make the message header a unicode string, which, if it then tries to
@@ -414,8 +437,8 @@ def clean_headers(headers):
   clean = {}
   try:
     for k, v in six.iteritems(headers):
-      clean_k = k if isinstance(k, bytes) else str(k).encode('ascii')
-      clean_v = v if isinstance(v, bytes) else str(v).encode('ascii')
+      clean_k = _clean_header(k)
+      clean_v = _clean_header(v)
       clean[clean_k] = clean_v
   except UnicodeEncodeError:
     raise NonAsciiHeaderError(k + ': ' + v)

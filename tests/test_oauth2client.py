@@ -20,6 +20,7 @@
 Unit tests for oauth2client.
 """
 
+# pylint: disable=bad-indentation
 __author__ = 'jcgregorio@google.com (Joe Gregorio)'
 
 import base64
@@ -531,7 +532,7 @@ class BasicCredentialsTests(unittest.TestCase):
       ])
       http = self.credentials.authorize(http)
       resp, content = http.request('http://example.com')
-      self.assertEqual(b'Bearer 1/3w', content[b'Authorization'])
+      self.assertEqual('Bearer 1/3w', content['Authorization'])
       self.assertFalse(self.credentials.access_token_expired)
       self.assertEqual(token_response, self.credentials.token_response)
 
@@ -599,17 +600,17 @@ class BasicCredentialsTests(unittest.TestCase):
 
     # First, test that we correctly encode basic objects, making sure
     # to include a bytes object. Note that oauth2client will normalize
-    # everything to bytes, no matter what python version we're in.
+    # everything to strings, no matter what python version we're in.
     http = credentials.authorize(HttpMock(headers={'status': '200'}))
     headers = {u'foo': 3, b'bar': True, 'baz': b'abc'}
-    cleaned_headers = {b'foo': b'3', b'bar': b'True', b'baz': b'abc'}
+    cleaned_headers = {'foo': '3', 'bar': 'True', 'baz': 'abc'}
     http.request(u'http://example.com', method=u'GET', headers=headers)
     for k, v in cleaned_headers.items():
       self.assertTrue(k in http.headers)
       self.assertEqual(v, http.headers[k])
 
     # Next, test that we do fail on unicode.
-    unicode_str = six.unichr(40960) + 'abcd'
+    unicode_str = u'\u2602' + 'abcd'
     self.assertRaises(
         NonAsciiHeaderError,
         http.request,
@@ -631,14 +632,21 @@ class BasicCredentialsTests(unittest.TestCase):
     http = HttpMock(headers={'status': '200'})
     http = credentials.authorize(http)
     http.request(u'http://example.com', method=u'GET', headers={u'foo': u'bar'})
+
+    # oauth2client uses httplib2 and httplib2 says:
+    # "** THE RESPONSE HEADERS ARE STRINGS, BUT THE CONTENT BODY IS BYTES **"
+    # and from https://github.com/jcgregorio/httplib2/wiki/Examples-Python3
+    # "In httplib2, the response headers are strings..."
+    #
+    # So, the headers should be of type str.
     for k, v in six.iteritems(http.headers):
-      self.assertEqual(six.binary_type, type(k))
-      self.assertEqual(six.binary_type, type(v))
+      self.assertTrue(isinstance(k, str))
+      self.assertTrue(isinstance(v, str))
 
     # Test again with unicode strings that can't simply be converted to ASCII.
     try:
       http.request(
-          u'http://example.com', method=u'GET', headers={u'foo': u'\N{COMET}'})
+          u'http://example.com', method=u'GET', headers={u'foo': u'\u2602'})
       self.fail('Expected exception to be raised.')
     except NonAsciiHeaderError:
       pass
@@ -724,7 +732,7 @@ class AccessTokenCredentialsTests(unittest.TestCase):
       ])
     http = self.credentials.authorize(http)
     resp, content = http.request('http://example.com')
-    self.assertEqual(b'Bearer foo', content[b'Authorization'])
+    self.assertEqual('Bearer foo', content['Authorization'])
 
 
 class TestAssertionCredentials(unittest.TestCase):
@@ -755,7 +763,7 @@ class TestAssertionCredentials(unittest.TestCase):
       ])
     http = self.credentials.authorize(http)
     resp, content = http.request('http://example.com')
-    self.assertEqual(b'Bearer 1/3w', content[b'Authorization'])
+    self.assertEqual('Bearer 1/3w', content['Authorization'])
 
   def test_token_revoke_success(self):
     _token_revoke_test_helper(

@@ -29,7 +29,11 @@ import os
 import time
 import unittest
 import urllib
-import urlparse
+
+try:
+  import urlparse
+except ImportError:
+  from urllib.parse import urlparse
 
 import dev_appserver
 dev_appserver.fix_sys_path()
